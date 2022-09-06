@@ -1,6 +1,7 @@
 extends Reference
 
 const _PRIORITIES = {
+	'**': 4,
 	'u+': 3,
 	'u-': 3,
 	'*':  2,
@@ -12,7 +13,7 @@ const _PRIORITIES = {
 var _re := RegEx.new()
 
 func _init() -> void:
-	var _e := _re.compile('\\d+(?:\\.\\d+)?|\\+|-|\\*|/|\\(|\\)|(.)')
+	var _e := _re.compile('\\d+(?:\\.\\d+)?|\\+|-|\\*\\*?|/|\\(|\\)|(.)')
 
 func evalute(string: String) -> float:
 	return _evalute_rpn(_to_rpn(_tokenize(string)))
@@ -60,8 +61,12 @@ func _to_rpn(tokens: Array) -> Array:
 		while true:
 			if op_stack.empty() || op_stack.back() == '(':
 				break
-			if _PRIORITIES[op_stack.back()] < _PRIORITIES[token]:
+			var pd = _PRIORITIES[op_stack.back()] - _PRIORITIES[token]
+			if pd < 0:
 				break
+			if pd == 0 && token in ['**', 'u+', 'u-']: # Not left-associative.
+				break
+			# TODO: `2**-3`.
 			rpn.append(op_stack.pop_back())
 		
 		op_stack.append(token)
@@ -84,17 +89,18 @@ func _evalute_rpn(rpn: Array) -> float:
 			if operands.empty():
 				return NAN
 			a = operands.pop_back()
-		elif x in ['*', '/', '+', '-']:
+		elif x in ['**', '*', '/', '+', '-']:
 			if operands.size() < 2:
 				return NAN
 			b = operands.pop_back()
 			a = operands.pop_back()
 		
 		match x:
+			'**': operands.append(pow(a, b))
 			'u+': operands.append(+a)
 			'u-': operands.append(-a)
 			'*':  operands.append(a * b)
-			'/':  operands.append(a / b if b != 0 else NAN)
+			'/':  operands.append(a / b if b != 0.0 else NAN)
 			'+':  operands.append(a + b)
 			'-':  operands.append(a - b)
 			_:    operands.append(x)
